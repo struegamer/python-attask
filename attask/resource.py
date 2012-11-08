@@ -27,7 +27,7 @@ except ImportError, e:
     print(e)
     sys.exit(1)
 
-class AttaskResource(Resource):
+class AtTaskResource(Resource):
     """Subclass of Restkits Resource Class"""
 
     def __init__(self, url=None, pool_instance=None, **kwargs):
@@ -38,7 +38,7 @@ class AttaskResource(Resource):
         :inherits: Resource.__init__ parameters
         
         """
-        super(AttaskResource, self).__init__(url, follow_redirect=True,
+        super(AtTaskResource, self).__init__(url, follow_redirect=True,
                                      max_follow_redirect=10,
                                      pool=pool_instance,
                                      **kwargs)
@@ -51,7 +51,7 @@ class AttaskResource(Resource):
         headers = {'Content-Type':'application/json',
                    'Accept':'application/json'}
         kwargs['headers'] = headers
-        resp = super(AttaskResource, self).request(*args, **kwargs)
+        resp = super(AtTaskResource, self).request(*args, **kwargs)
         return json.loads(resp.body_string())
 
 

@@ -17,4 +17,36 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 ###############################################################################
 
-from attask_classes import AtTask
+import sys
+import json
+
+OBJCODE_CLASS = {
+               'PROJ':'ProjectRecord'
+               }
+class Record(object):
+    def __new__(cls, *args, **kwargs):
+        if 'raw_data' in kwargs:
+            raw_data = kwargs.get('raw_data', None)
+            if 'objCode' in raw_data:
+                objCode = raw_data.get('objCode')
+                if objCode in OBJCODE_CLASS.keys():
+                    data = raw_data
+                    aa = []
+                    kaa = {'data':raw_data}
+                    record = eval(OBJCODE_CLASS[objCode])(*aa, **kaa)
+                    return record
+        return None
+
+class BaseRecord(object):
+    def __init__(self, *args, **kwargs):
+        self._raw_data = None
+        if 'data' in kwargs:
+            self._raw_data = kwargs['data']
+    def __getattr__(self, attr):
+        if attr not in self.__dict__:
+            if attr in self._raw_data:
+                return self._raw_data[attr]
+        return None
+
+class ProjectRecord(object):
+    pass

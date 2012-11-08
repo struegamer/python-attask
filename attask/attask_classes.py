@@ -19,6 +19,8 @@
 
 import sys
 import json
+import pprint
+
 try:
     from restkit import BasicAuth
     from restkit.errors import Unauthorized
@@ -27,7 +29,8 @@ except ImportError, e:
     print(e)
     sys.exit(1)
 
-from resource import AttaskResource
+from resource import AtTaskResource
+
 class AtTaskError(object):
     def __init__(self, message):
         self._message = message
@@ -39,33 +42,122 @@ class AtTaskError(object):
 
 class AtTask(object):
     def __init__(self, attask_url=None, username=None, password=None):
-        self._attask = AttaskResource(attask_url)
+        self._attask_url = attask_url
         self._sessionid = ''
         self._username = username
         self._password = password
+        self._attask = AtTaskResource(self._attask_url)
+        self._session = AtTaskSession(self._attask)
+        self._projects = None
+        if self._login():
+            self._projects = AtTaskProjects(self._attask, self._session)
 
-    def login(self):
-        if self._username is None or self._password is None:
-            return False
-        try:
-            result = self._attask.get('/attask/api/login',
-                                      params_dict={'username':self._username,
-                                                   'password':self._password})
-            if 'sessionID' in result:
-                self._sessionid = result['sessionID']
-        except Unauthorized, e:
-            return AtTaskError(e.message)
+    @property
+    def attask(self):
+        return self._attask
+
+    @property
+    def session(self):
+        return self._session
+
+    @property
+    def projects(self):
+        return self._projects
+
+    def _login(self):
+        return self._session.login(self._username, self._password)
+
+    def logout(self):
+        self._session.logout()
+
+
+
+class AtTaskObject(object):
+    def __init__(self, attask=None):
+        self._attask = attask
+        self._pprinter = pprint.PrettyPrinter(indent=4)
 
     def list(self):
-        pass
-
-    def search(self, search=''):
         pass
 
     def get(self):
         pass
 
-class AtTaskProjects(AtTask):
-    def list(self):
-        return self._attask.get('/attask/api/proj/')
+    def search(self):
+        pass
 
+    def new(self):
+        pass
+
+    def update(self):
+        pass
+
+    def delete(self):
+        pass
+
+
+class AtTaskSession(AtTaskObject):
+    def __init__(self, attask=None):
+        super(AtTaskSession, self).__init__(attask)
+        self._session = None
+
+    @property
+    def session(self):
+        return self._session
+
+    @property
+    def session_id(self):
+        if self._session is not None and 'sessionID' in self._session:
+            return self._session['sessionID']
+    @property
+    def user_id(self):
+        if self._session is not None and 'userID' in self._session:
+            return self._session['userID']
+
+    def login(self, username=None, password=None):
+        if username is None or password is None:
+            return False
+        try:
+            result = self._attask.get('/attask/api/login',
+                                      params_dict={'username':username,
+                                                   'password':password})
+            self._pprinter.pprint(result)
+            if 'data' in result:
+                self._session = result['data']
+            return True
+        except Unauthorized, e:
+            return AtTaskError(e.message)
+    def logout(self):
+        if self._session is not None:
+            result = self._attask.get('/attask/api/logout',
+                                      params_dict={'sessionID':self.session_id})
+            if 'data' in result:
+                return result['data']['success']
+        return False
+
+class AtTaskProjects(AtTaskObject):
+    def __init__(self, attask=None, session=None):
+        super(AtTaskProjects, self).__init__(attask)
+        self._session = session
+        print self._session
+
+    def list(self):
+        print self._session.session_id
+        result = self._attask.get('/attask/api/project/search',
+                                  params_dict={'sessionID':
+                                              self._session.session_id, 'map':True})
+        self._pprinter.pprint(result)
+    def my(self, status='CUR'):
+        result = self._attask.get('/attask/api/project/search',
+                                  params_dict={
+                                               'sessionID':self._session.session_id,
+                                               'projectUserIDs':self._session.user_id,
+                                               'status':status
+                                               })
+        # 'assignedTo:ID':self._session.user_id
+        self._pprinter.pprint(result)
+    def get(self, project_id):
+        result = self._attask.get('/attask/api/project/{0}'.format(project_id),
+                                  params_dict={'sessionID':
+                                               self._session.session_id})
+        self._pprinter.pprint(result)

@@ -29,7 +29,10 @@ except ImportError, e:
     print(e)
     sys.exit(1)
 
-from resource import AtTaskResource
+from .resource import AtTaskResource
+from .record_types import Record
+
+FETCH_LIMIT=100
 
 class AtTaskError(object):
     def __init__(self, message):
@@ -51,6 +54,7 @@ class AtTask(object):
         self._projects = None
         if self._login():
             self._projects = AtTaskProjects(self._attask, self._session)
+            self._issues=AtTaskIssue(self._attask,self._session)
 
     @property
     def attask(self):
@@ -63,6 +67,10 @@ class AtTask(object):
     @property
     def projects(self):
         return self._projects
+    
+    @property
+    def issues(self):
+        return self._issues
 
     def _login(self):
         return self._session.login(self._username, self._password)
@@ -76,7 +84,6 @@ class AtTaskObject(object):
     def __init__(self, attask=None):
         self._attask = attask
         self._pprinter = pprint.PrettyPrinter(indent=4)
-
     def list(self):
         pass
 
@@ -139,25 +146,107 @@ class AtTaskProjects(AtTaskObject):
     def __init__(self, attask=None, session=None):
         super(AtTaskProjects, self).__init__(attask)
         self._session = session
-        print self._session
-
+        
+    def count(self,params={}):
+        params.update({'sessionID':self._session.session_id})
+        result=self._attask.get('attask/api/project/count',
+                                params_dict=params)
+        
+        return result['data']['count']
+        
     def list(self):
-        print self._session.session_id
-        result = self._attask.get('/attask/api/project/search',
-                                  params_dict={'sessionID':
-                                              self._session.session_id, 'map':True})
-        self._pprinter.pprint(result)
-    def my(self, status='CUR'):
-        result = self._attask.get('/attask/api/project/search',
-                                  params_dict={
-                                               'sessionID':self._session.session_id,
-                                               'projectUserIDs':self._session.user_id,
-                                               'status':status
-                                               })
-        # 'assignedTo:ID':self._session.user_id
-        self._pprinter.pprint(result)
+        resultlist=self.search()
+        return resultlist
+    
+    def my(self,params={}):
+        a={'projectUserIDs':self._session.user_id}
+        a.update(params)        
+        resultlist=self.search(a)
+        return resultlist
+    
     def get(self, project_id):
         result = self._attask.get('/attask/api/project/{0}'.format(project_id),
                                   params_dict={'sessionID':
                                                self._session.session_id})
+        if 'data' in result:
+            b=Record(raw_data=result['data'])
+            return b
+        
+    def search(self,params={}):
+        number_of_records=self.count(params)
+        counter=number_of_records/FETCH_LIMIT
+        resultlist=[]
+        for i in range(0,counter+1):
+            #print '$$FIRST: %s' % (i*FETCH_LIMIT)
+            #print '$$LIMIT: %s' % FETCH_LIMIT
+            p={'sessionID':self._session.session_id, 
+                                                   'map':True,
+                                                   '$$FIRST':(i*FETCH_LIMIT),
+                                                   '$$LIMIT':FETCH_LIMIT}
+            p.update(params)
+            result = self._attask.get('/attask/api/project/search',
+                                      params_dict=p)
+            if 'data' in result:
+                for i in result['data']:
+                    r=Record(raw_data=result['data'][i])
+                    resultlist.append(r)
+        return resultlist
+        
+        
+class AtTaskIssue(AtTaskObject):
+    def __init__(self,attask=None,session=None):
+        super(AtTaskIssue,self).__init__(attask)
+        self._session=session
+        
+    def _metadata(self):
+        result=self._attask.get('/attask/api/issue/metadata')
         self._pprinter.pprint(result)
+    def count(self,params={}):
+        params.update({'sessionID':self._session.session_id})
+        result=self._attask.get('attask/api/issue/count',
+                                params_dict=params)        
+        if 'data' in result:
+            return result['data']['count']
+        
+    def list(self,params={},project=None):
+        if project is not None:
+            a={'projectID':project.ID}
+            params.update(a)
+                
+        resultlist=self.search(params)
+        return resultlist
+    
+    def by_me(self,params={},project=None):
+        if project is not None:
+            a={'projectID':project.ID}
+            params.update(a)
+        params.update({'enteredByID':self._session.user_id})                
+        resultlist=self.search(params)
+        return resultlist
+    
+    def assigned_to_me(self,params={},project=None):
+        if project is not None:
+            a={'projectID':project.ID}
+            params.update(a)
+        params.update({'assignedToID':self._session.user_id,'fields':'parameterValues'})                
+        resultlist=self.search(params)
+        return resultlist
+                
+    def search(self,params={}):
+        number_of_records=self.count(params)
+        counter=number_of_records/FETCH_LIMIT
+        resultlist=[]
+        for i in range(0,counter+1):
+            p={'sessionID':self._session.session_id, 
+               'map':True,
+               '$$FIRST':(i*FETCH_LIMIT),
+               '$$LIMIT':FETCH_LIMIT}
+            p.update(params)
+            result = self._attask.get('/attask/api/issue/search',
+                                      params_dict=p)
+            if 'data' in result:
+                for i in result['data']:
+                    r=Record(raw_data=result['data'][i])
+                    resultlist.append(r)
+        return resultlist
+        

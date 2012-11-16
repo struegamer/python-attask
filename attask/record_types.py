@@ -21,7 +21,8 @@ import sys
 import json
 
 OBJCODE_CLASS = {
-               'PROJ':'ProjectRecord'
+               'PROJ':'ProjectRecord',
+               'OPTASK':'IssueRecord'
                }
 class Record(object):
     def __new__(cls, *args, **kwargs):
@@ -46,7 +47,14 @@ class BaseRecord(object):
         if attr not in self.__dict__:
             if attr in self._raw_data:
                 return self._raw_data[attr]
-        return None
+            return None
+        return self.__dict__[attr]
+    
+    def __repr__(self):
+        return json.dumps(self._raw_data)
 
-class ProjectRecord(object):
+class ProjectRecord(BaseRecord):
+    pass
+
+class IssueRecord(BaseRecord):
     pass
